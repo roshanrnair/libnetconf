@@ -78,15 +78,9 @@ static sigset_t fullsigset;
 #define LOCK(file_ds, ret) {\
 	sigfillset(&fullsigset);\
 	sigprocmask(SIG_SETMASK, &fullsigset, &(file_ds->ds_lock.sigset));\
-	clock_gettime(CLOCK_REALTIME, &tv_timeout);\
 	tv_timeout.tv_sec += NCDS_LOCK_TIMEOUT;\
-	if (sem_timedwait(file_ds->ds_lock.lock, &tv_timeout) == -1 && errno == ETIMEDOUT) {\
-		ret = 1;\
-		sigprocmask(SIG_SETMASK, &(file_ds->ds_lock.sigset), NULL);\
-	} else {\
-		ret = 0;\
-		file_ds->ds_lock.holding_lock = 1;\
-	}\
+	ret = 0;\
+	file_ds->ds_lock.holding_lock = 1;\
 }
 #define UNLOCK(file_ds) {\
 	sem_post(file_ds->ds_lock.lock);\

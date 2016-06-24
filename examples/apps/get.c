@@ -104,8 +104,8 @@ int main(int argc, char* argv[])
 	struct nc_session *session;
 	struct nc_filter *filter = NULL;
 	char* host = "localhost";
-	unsigned short port = 830;
-	char* user = NULL;
+	unsigned short port = 12022;
+	char* user = "admin";
 	char* data = NULL;
 	nc_rpc *rpc = NULL;
 	nc_reply *reply = NULL;

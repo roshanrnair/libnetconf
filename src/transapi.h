@@ -42,7 +42,7 @@
 #ifndef NC_TRANSAPI_H
 #define NC_TRANSAPI_H
 
-#include <sys/inotify.h>
+//#include <sys/inotify.h>
 #include <libxml/tree.h>
 #include "netconf.h"
 #include "error.h"

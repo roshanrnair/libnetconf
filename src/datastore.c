@@ -120,7 +120,7 @@ API char error_area;
 #define ERROR_POINTER ((void*)(&error_area))
 
 char* server_capabilities;
-pthread_spinlock_t server_cpblt_lock;
+//pthread_spinlock_t server_cpblt_lock;
 
 struct ncds_ds_list {
 	struct ncds_ds *datastore;
@@ -338,7 +338,7 @@ int ncds_sysinit(int flags)
 	};
 #endif
 
-	pthread_spin_init(&server_cpblt_lock, PTHREAD_PROCESS_SHARED);
+        //pthread_spin_init(&server_cpblt_lock, PTHREAD_PROCESS_SHARED);
 
 	internal_ds_count = 0;
 	for (i = 0; i < INTERNAL_DS_COUNT; i++) {
@@ -696,7 +696,6 @@ static int fmon_backup_file(const char* source)
 	return ret;
 }
 
-#define INOT_BUFLEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
 struct fmon {
 	int wd;
 	char flags;
@@ -711,191 +710,6 @@ struct fmon_arg {
 };
 static void* transapi_fmon(void *arg)
 {
-	struct fmon_arg *fmon_arg = (struct fmon_arg*)arg;
-	struct transapi_file_callbacks *fclbks = fmon_arg->fclbks;
-	struct ncds_ds *ds = fmon_arg->ds;
-	int inotify, i, r, ret;
-	struct fmon *wds;
-	char buf[INOT_BUFLEN], *p;
-	struct inotify_event *e;
-	char* config;
-	xmlDocPtr config_doc;
-	xmlNodePtr node;
-	xmlBufferPtr running_buf = NULL;
-	struct nc_err *err;
-	int execflag;
-	struct nc_session* dummy_session;
-	nc_rpc* rpc;
-	nc_reply *reply;
-	struct nc_cpblts* cpblts;
-	const struct ncds_lockinfo *lockinfo;
-
-	/* note thread creator that we stored passed arguments and the original
-	 * fmon_arg structure can be rewritten.
-	 */
-	fmon_arg->flag = 0;
-
-	if ((inotify = inotify_init1(IN_CLOEXEC)) == -1) {
-		ERROR("FMON thread failed on initiating inotify (%s).", strerror(errno));
-		return NULL;
-	}
-
-	wds = malloc(sizeof(struct fmon) * fclbks->callbacks_count);
-	pthread_cleanup_push(free, wds);
-
-	running_buf = xmlBufferCreate();
-	pthread_cleanup_push((void (*)(void*))&xmlBufferFree, running_buf);
-
-	dummy_session = nc_session_dummy("fmon", "server", NULL, cpblts = nc_session_get_cpblts_default());
-	nc_cpblts_free(cpblts);
-	pthread_cleanup_push((void (*)(void*))&nc_session_free, dummy_session);
-
-	for (i = 0; i < fclbks->callbacks_count; i++) {
-		if ((wds[i].wd = inotify_add_watch(inotify, fclbks->callbacks[i].path, IN_MODIFY|IN_IGNORED|IN_CLOSE_WRITE)) == -1) {
-			ERROR("Unable to monitor \"%s\" (%s)", fclbks->callbacks[i].path, strerror(errno));
-		} else {
-			/* create backup file with current content */
-			fmon_backup_file(fclbks->callbacks[i].path);
-		}
-		wds[i].flags = 0;
-	}
-
-	for (;;) {
-		r = read(inotify, buf, INOT_BUFLEN);
-		if (r == 0) {
-			ERROR("Inotify failed (EOF).");
-			break;
-		} else if (r == -1) {
-			ERROR("Inotify failed (%s).", strerror(errno));
-			break;
-		}
-
-		for (p = buf; p < buf + r;) {
-			e = (struct inotify_event*)p;
-
-			/* get index of the modified file */
-			for (i = 0; i < fclbks->callbacks_count; i++) {
-				if (wds[i].wd == e->wd) {
-					break;
-				}
-			}
-
-			if (e->mask & IN_IGNORED) {
-				/* the file was removed or replaced */
-				if ((wds[i].wd = inotify_add_watch(inotify, fclbks->callbacks[i].path, IN_MODIFY|IN_IGNORED|IN_CLOSE_WRITE)) == -1) {
-					if (errno == ENOENT) {
-						/* the file was removed */
-						VERB("File \"%s\" was removed is no more monitored.", fclbks->callbacks[i].path);
-					} else {
-						/* the file was replaced, but we cannot access the new file */
-						ERROR("Unable to continue in monitoring \"%s\" file (%s)", fclbks->callbacks[i].path, strerror(errno));
-					}
-				} else {
-					/* file was replaced and we now monitor the newly created file */
-					/* set its modified flag to 2 to execute callback */
-					wds[i].flags |= FMON_FLAG_UPDATE;
-				}
-			} else {
-				if (e->mask & IN_MODIFY) {
-					wds[i].flags |= FMON_FLAG_MODIFIED;
-				}
-				if ((e->mask & IN_CLOSE_WRITE) && (wds[i].flags & FMON_FLAG_MODIFIED)) {
-					wds[i].flags |= FMON_FLAG_UPDATE;
-				}
-			}
-
-			if (wds[i].flags & FMON_FLAG_UPDATE) {
-
-				if (wds[i].flags & FMON_FLAG_IGNORED) {
-					/* ignore our own backup restore */
-					wds[i].flags = 0;
-					goto next_event;
-				}
-
-				/* null the variables */
-				wds[i].flags = 0;
-				config_doc = NULL;
-				execflag = 0;
-
-				/* check that datastore is not locked */
-				lockinfo = ds->func.get_lockinfo(ds, NC_DATASTORE_RUNNING);
-				if (lockinfo && lockinfo->sid) {
-					VERB("FMON: Running datastore is locked by \"%s\"", lockinfo->sid);
-					WARN("FMON: Replacing changed \"%s\" with the backup file.", fclbks->callbacks[i].path);
-
-					/* note that next update notification of this file should be ignored */
-					wds[i].flags = FMON_FLAG_IGNORED;
-
-					/* restore original content */
-					fmon_restore_file(fclbks->callbacks[i].path);
-
-					goto next_event;
-				}
-
-				fclbks->callbacks[i].func(fclbks->callbacks[i].path, &config_doc, &execflag);
-				if (config_doc != NULL) {
-					/*
-					 * store running to the datastore
-					 */
-
-					/* check returned data format */
-					if (config_doc->children == NULL) {
-						ERROR("Invalid configuration data returned from transAPI FMON callback.");
-						goto next_event;
-					}
-
-					/* perform changes in datastore (and on device if set so) */
-					if (execflag) {
-						/* update running datastore including execution of the transAPI callbacks */
-						rpc = ncxml_rpc_editconfig(NC_DATASTORE_RUNNING,
-								NC_DATASTORE_CONFIG, NC_EDIT_DEFOP_NOTSET,
-								NC_EDIT_ERROPT_ROLLBACK, NC_EDIT_TESTOPT_NOTSET,
-								config_doc->children->children);
-						xmlFreeDoc(config_doc);
-						if (rpc == NULL) {
-							ERROR("FMON: Preparing edit-config RPC failed.");
-							goto next_event;
-						}
-
-						reply = ncds_apply_rpc2all(dummy_session, rpc, NULL);
-						nc_rpc_free(rpc);
-						if (reply == NULL || nc_reply_get_type(reply) != NC_REPLY_OK) {
-							ERROR("FMON: Performing edit-config RPC failed.");
-						}
-						nc_reply_free(reply);
-
-					} else {
-						/* do not execute transAPI callbacks, only update running datastore */
-						for (node = config_doc->children; node != NULL; node = node->next) {
-							xmlNodeDump(running_buf, config_doc, node, 0, 0);
-						}
-						xmlFreeDoc(config_doc);
-						config = strdup((char*)xmlBufferContent(running_buf));
-						xmlBufferEmpty(running_buf);
-
-						ret = ds->func.editconfig(ds, NULL, NULL,
-								NC_DATASTORE_RUNNING, config,
-								NC_EDIT_DEFOP_NOTSET, NC_EDIT_ERROPT_ROLLBACK, &err);
-						free(config);
-
-						if (ret != 0 && ret != EXIT_RPC_NOT_APPLICABLE) {
-							ERROR("Failed to update running configuration (%s).", err ? err->message : "unknown error");
-							nc_err_free(err);
-						}
-					}
-
-					/* update backup file */
-					fmon_backup_file(fclbks->callbacks[i].path);
-				}
-			}
-next_event:
-			p += sizeof(struct inotify_event) + e->len;
-		}
-	}
-
-	pthread_cleanup_pop(1);
-	pthread_cleanup_pop(1);
-	pthread_cleanup_pop(1);
 	return NULL;
 }
 
@@ -1575,7 +1389,7 @@ static char* get_state_monitoring(const char* UNUSED(model), const char* UNUSED(
 	}
 
 	/* get it all together */
-	pthread_spin_lock(&server_cpblt_lock);
+        //pthread_spin_lock(&server_cpblt_lock);
 	if (asprintf(&retval, "<netconf-state xmlns=\"%s\">%s%s%s%s%s</netconf-state>", NC_NS_MONITORING,
 			(server_capabilities != NULL) ? server_capabilities : "",
 			(ds_stats != NULL) ? ds_stats : "",
@@ -1585,7 +1399,7 @@ static char* get_state_monitoring(const char* UNUSED(model), const char* UNUSED(
 		ERROR("asprintf() failed (%s:%d).", __FILE__, __LINE__);
 		retval = NULL;
 	}
-	pthread_spin_unlock(&server_cpblt_lock);
+        //pthread_spin_unlock(&server_cpblt_lock);
 	if (retval == NULL) {
 		retval = strdup("");
 	}
@@ -4695,7 +4509,7 @@ void ncds_cleanall()
 	struct model_list *listitem, *listnext;
 	int i;
 
-	pthread_spin_destroy(&server_cpblt_lock);
+        //pthread_spin_destroy(&server_cpblt_lock);
 
 	ds_item = ncds.datastores;
 	while (ds_item != NULL) {
@@ -6531,9 +6345,9 @@ API nc_reply* ncds_apply_rpc2all(struct nc_session* session, const nc_rpc* rpc, 
 		break;
 	case NC_OP_GET:
 		data = serialize_cpblts(session->capabilities);
-		pthread_spin_lock(&server_cpblt_lock);
+                //pthread_spin_lock(&server_cpblt_lock);
 		server_capabilities = data;
-		pthread_spin_unlock(&server_cpblt_lock);
+                //pthread_spin_unlock(&server_cpblt_lock);
 		/* no break */
 	case NC_OP_GETCONFIG:
 		shared_filter = nc_rpc_get_filter(rpc);
@@ -6564,10 +6378,10 @@ API nc_reply* ncds_apply_rpc2all(struct nc_session* session, const nc_rpc* rpc, 
 			if ((new_reply = nc_reply_merge(2, old_reply, reply)) == NULL) {
 				nc_filter_free(shared_filter);
 				shared_filter = NULL;
-				pthread_spin_lock(&server_cpblt_lock);
+                                //pthread_spin_lock(&server_cpblt_lock);
 				free(server_capabilities);
 				server_capabilities = NULL;
-				pthread_spin_unlock(&server_cpblt_lock);
+                                //pthread_spin_unlock(&server_cpblt_lock);
 
 				if (nc_reply_get_type(old_reply) == NC_REPLY_ERROR) {
 					return (old_reply);
@@ -6641,10 +6455,10 @@ cleanup:
 	nc_filter_free(shared_filter);
 	shared_filter = NULL;
 
-	pthread_spin_lock(&server_cpblt_lock);
+        //pthread_spin_lock(&server_cpblt_lock);
 	free(server_capabilities);
 	server_capabilities = NULL;
-	pthread_spin_unlock(&server_cpblt_lock);
+        //pthread_spin_unlock(&server_cpblt_lock);
 
 	return (reply);
 }

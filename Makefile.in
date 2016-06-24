@@ -39,7 +39,8 @@ LNCTOOL = dev-tools/lnctool/lnctool
 
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
 srcdir = @srcdir@
-abs_srcdir = @abs_srcdir@
+abs_srcdira = @abs_srcdir@
+abs_srcdir = "$(abs_srcdira)"
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 datarootdir = @datarootdir@
@@ -63,7 +64,6 @@ DOXYGEN = @DOXYGEN@
 DOXYGEN_CONFIG = Doxyfile
 DOXYGEN_DIR = $(shell cat $(DOXYGEN_CONFIG) | grep '^OUTPUT_DIRECTORY' | sed 's/.*=//')
 RPMBUILD = @RPMBUILD@
-LDCONFIG = ldconfig
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
@@ -297,14 +297,13 @@ rpm: tarball $(TARBALLPYAPI)
 	fi
 
 .PHONY: install
-install: all install-bin install-devel install-doc $(INSTALLPYAPI)
+install: all install-bin install-devel $(INSTALLPYAPI)
 
 .PHONY: install-bin
 install-bin:
 	$(INSTALL) -m 775 -d $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=install cp $(NAME).la $(DESTDIR)/$(libdir)
 	$(LIBTOOL) --mode=finish $(DESTDIR)/$(libdir)
-	@if test "`id -u`" = "0"; then $(LDCONFIG); fi
 	[ -d "$(NC_WORKINGDIR_PATH)" ] || \
 		mkdir -p $(NC_WORKINGDIR_PATH)
 	chmod 700 $(NC_WORKINGDIR_PATH)
