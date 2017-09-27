@@ -664,6 +664,7 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 	char port_s[SHORT_INT_LENGTH];
 	NC_TRANSPORT *transport_proto = NULL;
 
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect\n");
 	/* set default values */
 	if (host == NULL || strisempty(host)) {
 		host = "localhost";
