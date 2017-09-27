@@ -676,10 +676,12 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 	if (snprintf(port_s, SHORT_INT_LENGTH, "%d", port) < 0) {
 		/* converting short int to the string failed */
 		ERROR("Unable to convert the port number to a string.");
+                printf("Roshan : INside  LIBNETCONF Unable to convert the port number to a string.");
 		return (NULL);
 	}
 
 #ifdef ENABLE_TLS
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect ifdef ENABLE_TLS\n");
 	pthread_once(&transproto_key_once, transproto_init);
 	if ((transport_proto = pthread_getspecific(transproto_key)) == NULL) {
 		pthread_setspecific(transproto_key, &proto_ssh);
@@ -692,19 +694,23 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 		retval = nc_session_connect_ssh(username, host, port_s, ssh_sess);
 	}
 #else  /* not ENABLE_TLS */
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect ELSE ENABLE_TLS\n");
 	retval = nc_session_connect_ssh(username, host, port_s, ssh_sess);
 #endif /* not ENABLE_TLS */
 
 	if (retval == NULL) {
+                printf("Roshan : Inside LIBNETCONF _nc_session_connect return NULL\n");
 		return (NULL);
 	}
 
 	retval->transport = (transport_proto == NULL) ? NC_TRANSPORT_SSH : *transport_proto;
 	retval->status = NC_SESSION_STATUS_WORKING;
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect NC_SESSION_STATUS_WORKING\n");
 
 	if (cpblts == NULL) {
 		if ((client_cpblts = nc_session_get_cpblts_default()) == NULL) {
 			VERB("Unable to set the client's NETCONF capabilities.");
+                        printf("Roshan : Inside LIBNETCONF _nc_session_connect GOTO SHUTDOWN 1\n");
 			goto shutdown;
 		}
 	} else {
@@ -712,6 +718,7 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 	}
 
 	if (nc_client_handshake(retval, client_cpblts->list) != 0) {
+                printf("Roshan : Inside LIBNETCONF _nc_session_connect GOTO SHUTDOWN 2\n");
 		goto shutdown;
 	}
 
@@ -721,10 +728,12 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 	/* cleanup */
 	nc_cpblts_free(client_cpblts);
 
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect END retval=%d\n", retval);
 	return (retval);
 
 shutdown:
 
+        printf("Roshan : Inside LIBNETCONF _nc_session_connect SHUTDOWN\n");
 	/* cleanup */
 	nc_session_close(retval, NC_SESSION_TERM_OTHER);
 	nc_session_free(retval);
