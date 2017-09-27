@@ -689,8 +689,10 @@ struct nc_session* _nc_session_connect(const char* host, unsigned short port, co
 	}
 
 	if (*transport_proto == NC_TRANSPORT_TLS) {
+                printf("Roshan : Inside LIBNETCONF _nc_session_connect ifdef ENABLE_TLS nc_session_connect_tls\n");
 		retval = nc_session_connect_tls(username, host, port_s);
 	} else {
+                printf("Roshan : Inside LIBNETCONF _nc_session_connect ifdef ENABLE_TLS nc_session_connect_ssh\n");
 		retval = nc_session_connect_ssh(username, host, port_s, ssh_sess);
 	}
 #else  /* not ENABLE_TLS */
