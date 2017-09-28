@@ -289,6 +289,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 
 	/* select authentication according to preferences */
 	for (i = 0; i < AUTH_COUNT; i++) {
+                printf("Roshan : Inside nc_session_connect_libssh_socket FOR i=%d, AUTH_COUNT=%d, sshauth_pref.type=%d\n", i, AUTH_COUNT, sshauth_pref[i].type);
 		if ((sshauth_pref[i].type & auth) == 0) {
 			/* method not supported by server, skip */
 			continue;
