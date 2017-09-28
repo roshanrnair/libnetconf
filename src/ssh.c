@@ -306,9 +306,10 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		switch (sshauth_pref[i].type) {
 		case NC_SSH_AUTH_PASSWORD:
 			VERB("Password authentication (host %s, user %s)", host, username);
-			printf("Password authentication (host %s, user %s)", host, username);
 			s = callbacks.sshauth_password(username, host);
+			printf("Password authentication (host %s, user %s) (%s)\n", host, username, s);
 			while ((ret_auth = ssh_userauth_password(retval->ssh_sess, username, s)) == SSH_AUTH_AGAIN) {
+                                printf("Roshan : Inside nc_session_connect_libssh_socket ssh_userauth_password usleep NC_READ_SLEEP\n");
 				usleep(NC_READ_SLEEP);
 			}
 			if (ret_auth != SSH_AUTH_SUCCESS) {
@@ -320,7 +321,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 			break;
 		case NC_SSH_AUTH_INTERACTIVE:
 			VERB("Keyboard-interactive authentication");
-			printf("Keyboard-interactive authentication");
+			printf("Keyboard-interactive authentication\n");
 			while (((ret_auth = ssh_userauth_kbdint(retval->ssh_sess, NULL, NULL)) == SSH_AUTH_INFO) || (ret_auth == SSH_AUTH_AGAIN)) {
 				if (ret_auth == SSH_AUTH_AGAIN) {
 					usleep(NC_READ_SLEEP);
@@ -353,7 +354,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 			break;
 		case NC_SSH_AUTH_PUBLIC_KEYS:
 			VERB("Publickey athentication");
-			printf("Publickey athentication");
+			printf("Publickey athentication\n");
 
 			for (j = 0; j < SSH_KEYS; ++j) {
 				if (callbacks.publickey_filename[j] != NULL && callbacks.privatekey_filename[j] != NULL) {
@@ -376,7 +377,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 
 				VERB("Trying to authenticate using %spair %s %s",
 						callbacks.key_protected[j] ? "password-protected " : "", callbacks.privatekey_filename[j], callbacks.publickey_filename[j]);
-				printf("Trying to authenticate using %spair %s %s",
+				printf("Trying to authenticate using %spair %s %s\n",
 						callbacks.key_protected[j] ? "password-protected " : "", callbacks.privatekey_filename[j], callbacks.publickey_filename[j]);
 
 				if (ssh_pki_import_pubkey_file(callbacks.publickey_filename[j], &pubkey) != SSH_OK) {
