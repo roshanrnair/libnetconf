@@ -306,6 +306,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		switch (sshauth_pref[i].type) {
 		case NC_SSH_AUTH_PASSWORD:
 			VERB("Password authentication (host %s, user %s)", host, username);
+			printf("Password authentication (host %s, user %s)", host, username);
 			s = callbacks.sshauth_password(username, host);
 			while ((ret_auth = ssh_userauth_password(retval->ssh_sess, username, s)) == SSH_AUTH_AGAIN) {
 				usleep(NC_READ_SLEEP);
@@ -315,9 +316,11 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 				VERB("Authentication failed (%s)", ssh_get_error(retval->ssh_sess));
 			}
 			free(s);
+                        printf("Roshan : Inside nc_session_connect_libssh_socket Password authentication FAILED (host %s, user %s)", host, username);
 			break;
 		case NC_SSH_AUTH_INTERACTIVE:
 			VERB("Keyboard-interactive authentication");
+			printf("Keyboard-interactive authentication");
 			while (((ret_auth = ssh_userauth_kbdint(retval->ssh_sess, NULL, NULL)) == SSH_AUTH_INFO) || (ret_auth == SSH_AUTH_AGAIN)) {
 				if (ret_auth == SSH_AUTH_AGAIN) {
 					usleep(NC_READ_SLEEP);
@@ -326,6 +329,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 				for (j = 0; j < ssh_userauth_kbdint_getnprompts(retval->ssh_sess); ++j) {
 					prompt = ssh_userauth_kbdint_getprompt(retval->ssh_sess, j, &echo);
 					if (prompt == NULL) {
+                                                printf("Roshan : Inside nc_session_connect_libssh_socket prompt == NULL\n");
 						break;
 					}
 					answer = callbacks.sshauth_interactive(
@@ -334,6 +338,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 						prompt, echo);
 					if (ssh_userauth_kbdint_setanswer(retval->ssh_sess, j, answer) < 0) {
 						free(answer);
+                                                printf("Roshan : Inside nc_session_connect_libssh_socket ssh_userauth_kbdint_setanswer\n");
 						break;
 					}
 					free(answer);
@@ -344,9 +349,11 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 				VERB("Authentication failed (%s)", ssh_get_error(retval->ssh_sess));
 			}
 
+                        printf("Roshan : Inside nc_session_connect_libssh_socket Authentication failed\n");
 			break;
 		case NC_SSH_AUTH_PUBLIC_KEYS:
 			VERB("Publickey athentication");
+			printf("Publickey athentication");
 
 			for (j = 0; j < SSH_KEYS; ++j) {
 				if (callbacks.publickey_filename[j] != NULL && callbacks.privatekey_filename[j] != NULL) {
@@ -357,6 +364,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 			/* if publickeys path not provided, we cannot continue */
 			if (j == SSH_KEYS) {
 				VERB("No key pair specified.");
+				printf("No key pair specified.");
 				break;
 			}
 
@@ -367,6 +375,8 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 				}
 
 				VERB("Trying to authenticate using %spair %s %s",
+						callbacks.key_protected[j] ? "password-protected " : "", callbacks.privatekey_filename[j], callbacks.publickey_filename[j]);
+				printf("Trying to authenticate using %spair %s %s",
 						callbacks.key_protected[j] ? "password-protected " : "", callbacks.privatekey_filename[j], callbacks.publickey_filename[j]);
 
 				if (ssh_pki_import_pubkey_file(callbacks.publickey_filename[j], &pubkey) != SSH_OK) {
@@ -415,6 +425,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 
 				if (ret_auth == SSH_AUTH_ERROR) {
 					ERROR("Authentication failed (%s)", ssh_get_error(retval->ssh_sess));
+					printf("NC_SSH_AUTH_PUBLIC_KEYS Authentication failed (%s)", ssh_get_error(retval->ssh_sess));
 				}
 				if (ret_auth == SSH_AUTH_SUCCESS) {
 					break;
