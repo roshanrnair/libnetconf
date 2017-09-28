@@ -138,6 +138,7 @@ int transport_connect_socket(const char* host, const char* port)
 	int i, flags, sock = -1;
 	struct addrinfo hints, *res_list, *res;
 
+printf("Roshan : Inside transport_connect_socket START\n");
 	/* Connect to a server */
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -146,6 +147,7 @@ int transport_connect_socket(const char* host, const char* port)
 	i = getaddrinfo(host, port, &hints, &res_list);
 	if (i != 0) {
 		ERROR("Unable to translate the host address (%s).", gai_strerror(i));
+                printf("Roshan : Inside transport_connect_socket return -1 1\n");
 		return (-1);
 	}
 
@@ -169,6 +171,7 @@ int transport_connect_socket(const char* host, const char* port)
 		if (((flags = fcntl(sock, F_GETFL)) == -1) || (fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1)) {
 			ERROR("Fcntl failed (%s).", strerror(errno));
 			close(sock);
+                printf("Roshan : Inside transport_connect_socket return -1 2\n");
 			return -1;
 		}
 
@@ -185,6 +188,7 @@ errloop:
 		ERROR("Unable to connect to %s:%s.", host, port);
 	}
 
+printf("Roshan : Inside transport_connect_socket return sock END\n");
 	return (sock);
 }
 

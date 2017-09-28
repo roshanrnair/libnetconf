@@ -156,6 +156,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	ssh_key pubkey, privkey;
 	struct passwd *pw;
 
+        printf("Roshan : Inside nc_session_connect_libssh_socket START\n");
 	if (sock == -1) {
 		return (NULL);
 	}
@@ -166,6 +167,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		if (pw == NULL) {
 			/* unable to get correct username (errno from getpwuid) */
 			ERROR("Unable to set a username for the SSH connection (%s).", strerror(errno));
+                        printf("Roshan : Inside nc_session_connect_libssh_socket Unable to set a username for the SSH connection (%s).", strerror(errno));
 			return (NULL);
 		}
 		username = pw->pw_name;
@@ -175,10 +177,12 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	retval = calloc(1, sizeof(struct nc_session));
 	if (retval == NULL) {
 		ERROR("Memory allocation failed (%s)", strerror(errno));
+                printf("Roshan : Inside nc_session_connect_libssh_socket  Memory allocation failed (%s) 1", strerror(errno));
 		return (NULL);
 	}
 	if ((retval->stats = malloc (sizeof (struct nc_session_stats))) == NULL) {
 		ERROR("Memory allocation failed (%s)", strerror(errno));
+                printf("Roshan : Inside nc_session_connect_libssh_socket  Memory allocation failed (%s) 2", strerror(errno));
 		free(retval);
 		return NULL;
 	}
@@ -189,6 +193,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	retval->msgid = 1;
 
 	if (pthread_mutexattr_init(&mattr) != 0) {
+                printf("Roshan : Inside nc_session_connect_libssh_socket Memory allocation failed (%s:%d).", __FILE__, __LINE__);
 		ERROR("Memory allocation failed (%s:%d).", __FILE__, __LINE__);
 		free(retval);
 		return (NULL);
@@ -203,6 +208,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		ERROR("Mutex initialization failed (%s).", strerror(r));
 		pthread_mutexattr_destroy(&mattr);
 		free(retval);
+                printf("Roshan : Inside nc_session_connect_libssh_socket Mutex initialization failed (%s).", strerror(r));
 		return (NULL);
 	}
 	pthread_mutexattr_destroy(&mattr);
@@ -214,6 +220,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		retval->ssh_sess = ssh_new();
 		if (retval->ssh_sess == NULL) {
 			ERROR("Unable to initialize the SSH session.");
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 1\n");
 			goto shutdown;
 		}
 	}
@@ -236,11 +243,13 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	if (r != SSH_OK) {
 		ERROR("Starting the SSH session failed (%s)", ssh_get_error(retval->ssh_sess));
 		DBG("Error code %d.", ssh_get_error_code(retval->ssh_sess));
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 2\n");
 		goto shutdown;
 	}
 
 	if (callbacks.hostkey_check(host, retval->ssh_sess) != 0) {
 		ERROR("Checking the host key failed.");
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 3\n");
 		goto shutdown;
 	}
 
@@ -249,6 +258,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	}
 	if (ret_auth == SSH_AUTH_ERROR) {
 		ERROR("Authentication failed (%s).", ssh_get_error(retval->ssh_sess));
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 4\n");
 		goto shutdown;
 	}
 
@@ -273,6 +283,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	}
 	if (auth == 0 && ret_auth != SSH_AUTH_SUCCESS) {
 		ERROR("Unable to authenticate to the remote server (Authentication methods not supported).");
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 5\n");
 		goto shutdown;
 	}
 
@@ -286,6 +297,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		if (sshauth_pref[i].value < 0) {
 			/* all following auth methods are disabled via negative preference value */
 			ERROR("Unable to authenticate to the remote server (method disabled or permission denied).");
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 6\n");
 			goto shutdown;
 		}
 
@@ -418,6 +430,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	/* check a state of authentication */
 	if (ret_auth != SSH_AUTH_SUCCESS) {
 		ERROR("Authentication failed.");
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 7\n");
 		goto shutdown;
 	}
 
@@ -430,6 +443,7 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 		ssh_channel_free(retval->ssh_chan);
 		retval->ssh_chan = NULL;
 		ERROR("Opening the SSH channel failed (%s)", ssh_get_error(retval->ssh_sess));
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 8\n");
 		goto shutdown;
 	}
 
@@ -439,9 +453,11 @@ struct nc_session *nc_session_connect_libssh_socket(const char* username, const 
 	}
 	if (r != SSH_OK) {
 		ERROR("Starting the netconf SSH subsystem failed (%s)", ssh_get_error(retval->ssh_sess));
+                        printf("Roshan : Inside nc_session_connect_libssh_socket goto shutdown 9\n");
 		goto shutdown;
 	}
 
+        printf("Roshan : Inside nc_session_connect_libssh_socket return retval=%d END\n", retval);
 	return (retval);
 
 shutdown:
@@ -449,6 +465,7 @@ shutdown:
 	/* cleanup */
 	nc_session_close(retval, NC_SESSION_TERM_OTHER);
 	nc_session_free(retval);
+        printf("Roshan : Inside nc_session_connect_libssh_socket return NULL END\n");
 
 	return (NULL);
 }
@@ -464,16 +481,20 @@ struct nc_session *nc_session_connect_ssh(const char* username, const char* host
 	struct nc_session *retval = NULL;
 	int sock = -1;
 
+        printf("Roshan : Inside nc_session_connect_ssh START\n");
 	sock = transport_connect_socket(host, port);
 	if (sock == -1) {
+                printf("Roshan : Inside nc_session_connect_ssh if SOCK == -1 return NULL\n");
 		return (NULL);
 	}
 
 	retval = nc_session_connect_libssh_socket(username, host, sock, ssh_sess);
 	if (retval != NULL) {
+                printf("Roshan : Inside nc_session_connect_ssh if retval != NULL retval=%d\n", retval);
 		retval->hostname = strdup(host);
 		retval->port = strdup(port);
 	} else {
+                printf("Roshan : Inside nc_session_connect_ssh if retval == NULL\n");
 		close(sock);
 	}
 
